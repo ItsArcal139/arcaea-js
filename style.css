@@ -1,0 +1,70 @@
+@font-face {
+    font-family: Geosans;
+    font-weight: 300;
+    src: url("./assets/fonts/GeosansLight.ttf");
+}
+
+@font-face {
+    font-family: ExoFallback;
+    src: url("./assets/fonts/Exo-Regular.ttf");
+}
+
+canvas#main {
+    width: 100%;
+    display: block;
+}
+
+#game-area {
+    width: 77%;
+    margin: 0 auto;
+    position: relative;
+}
+
+#combo-wrapper {
+    position: absolute;
+    width: 100%;
+    height: 53%;
+    top: 47%;
+    text-align: center;
+}
+
+#combo {
+    font-family: Geosans, sans-serif;
+    font-size: 115px;
+    letter-spacing: 0;
+    color: rgba(120, 60, 120, 0.5);
+}
+
+#info-wrapper {
+    position: absolute;
+    width: 247.188px;
+    height: 129.594px;
+    background: url("./assets/textures/Info.png");
+    background-size: cover;
+    top: 15px;
+    right: 0;
+}
+
+#score {
+    display: inline-block;
+    margin: 14px 43px;
+    font-family: Exo, ExoFallback, sans-serif;
+    font-size: 32px;
+    color: #fff;
+}
+
+#game-audio {
+    width: 100%;
+    margin-top: 10px;
+}
+
+@media (max-width: 1250px) {
+    #combo-wrapper {
+        height: 60%;
+        top: 40%;
+    }
+
+    #combo {
+        font-size: 80px;
+    }
+}
