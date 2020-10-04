@@ -28,9 +28,17 @@
             currentGame.gameplayManager.audioManager.setPlaybackRate(v / base);
         }
     });
+    Object.defineProperty(Helper, "dropRate", {
+        get: () => {
+            return currentGame.timingManager.dropRate / 30;
+        },
+        set: (v) => {
+            currentGame.timingManager.dropRate = v * 30;
+        }
+    });
 
     var appearance = gui.addFolder("外觀設定");
-    appearance.add(currentGame.timingManager, "dropRate").min(1).max(200).listen();
+    appearance.add(Helper, "dropRate").min(1).max(10).step(0.1).listen();
     appearance.add(Helper, "rebuildArcs");
 
     var audio = gui.addFolder("聲音設定");

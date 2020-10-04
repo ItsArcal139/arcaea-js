@@ -318,6 +318,10 @@ class Chart {
         });
         return result;
     }
+
+    getPrimaryTimingGroup() {
+        return this.timingGroups[0];
+    }
 }
 
 class AffFormatError extends Error {
@@ -338,6 +342,9 @@ class TimingGroup {
         this.pairCount = 0;
         this.starts = [];
         this.ends = [];
+
+        /** @type {TimingEvent[]} */
+        this.timings = null;
     }
 
     export(offset = 0) {
@@ -359,7 +366,7 @@ class TimingGroup {
 
     getBaseBpm() {
         /** @type {TimingEvent} */
-        var event = this.getTimingEvents().sort((a, b) => a.time - b.time)[0];
+        var event = this.getTimingEvents()[0];
 
         if(!event) {
             throw new AffFormatError("Invalid Arcaea file format. The timing group has no timing event.");
@@ -369,9 +376,14 @@ class TimingGroup {
 
     /** @return {TimingEvent[]} */
     getTimingEvents() {
-        return this.events.filter(n => {
-            return n instanceof TimingEvent;
-        });
+        if(this.timings == null) {
+            this.timings = Object.freeze(this.events.filter(n => {
+                return n instanceof TimingEvent;
+            }).sort((a, b) => {
+                return a.time - b.time
+            }));
+        }
+        return this.timings;
     }
 
     /**
@@ -463,7 +475,7 @@ class TimingGroup {
             }
         } else if(start == end) {
             delta = (endPos - startPos);
-            endTime = delta / ((timings[end].bpm / this.getBaseBpm()) * this.getDropRate()) + time;
+            endTime = delta / (((timings[end].bpm || 1) / this.getBaseBpm()) * this.getDropRate()) + time;
             if(endTime > songLength) return songLength;
             return Math.floor(endTime);
         }
@@ -474,11 +486,11 @@ class TimingGroup {
                 if(timings[breakPos].bpm == 0) endTime = timings[breakPos].time + offset;
                 else endTime = time;
             } else {
-                endTime = delta / ((timings[breakPos].bpm / this.getBaseBpm()) * this.getDropRate()) + time;
+                endTime = delta / (((timings[breakPos].bpm || 1) / this.getBaseBpm()) * this.getDropRate()) + time;
             }
         } else if(breakPos != -1) {
             delta = (endPos - startPos);
-            endTime = delta / ((timings[breakPos].bpm / this.getBaseBpm()) * this.getDropRate()) + timings[breakPos].time + offset;
+            endTime = delta / (((timings[breakPos].bpm || 1) / this.getBaseBpm()) * this.getDropRate()) + timings[breakPos].time + offset;
         } else if(breakPos == -1) {
             endTime = songLength;
         }
@@ -507,6 +519,10 @@ class TimingGroup {
         var current = start > timing ? timing : start;
         var target = start > timing ? start : timing;
         var reverse = start > timing;
+
+        current -= offset;
+        target -= offset;
+        offset = 0;
 
         var pos = 0;
         var a = 0;
@@ -539,7 +555,7 @@ class TimingGroup {
         } else {
             for(var i=a; i<=b; i++) {
                 if(i == a) pos += (timings[i+1].time + offset - current) * timings[i].bpm / base * dropRate;
-                else if(i != a && i != b) pos += (timings[i+1].time - timings[i].time) * timings[i].bpm / base * dropRate;
+                else if(i != a && i != b) pos += (timings[i+1].time - timings[i].time - offset) * timings[i].bpm / base * dropRate;
                 else if(i == b) pos += (target - timings[i].time + offset) * timings[i].bpm / base * dropRate;
             }
         }
@@ -583,7 +599,7 @@ class AffExportError extends Error {
      * @param {string | null} msg
      */
     constructor(msg = null) {
-        super(msg = null);
+        super(msg);
     }
 }
 
@@ -688,11 +704,10 @@ class TapNote extends ArcaeaJudgableEvent {
 
     static newObject() {
         var loader = new THREE.TextureLoader();
-        var texture = loader.load("./assets/textures/TapNote.png");
-        texture.anisotropy = 16;
+        var texture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/TapNote.png");
 
         var material = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0x8dcee6 : 0xffffff,
             map: texture,
             transparent: true
         });
@@ -702,7 +717,7 @@ class TapNote extends ArcaeaJudgableEvent {
         obj.position.y = 0.11;
         obj.position.z = -0.5;
         obj.scale.x = 4.2746 * 0.95;
-        obj.scale.y = 1.6;
+        obj.scale.y = 2.3;
         obj.scale.z = 1 * 0.95;
         obj.setRotationFromEuler(new THREE.Euler(-90 / 180 * Math.PI, 0, 0));
         return obj;
@@ -791,11 +806,10 @@ class HoldNote extends ArcaeaJudgableEvent {
 
     static newObject() {
         var loader = new THREE.TextureLoader();
-        var texture = loader.load("./assets/textures/HoldNote.png");
-        texture.anisotropy = 16;
+        var texture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/HoldNote.png");
 
         var material = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0x8dcee6 : 0xffffff,
             map: texture,
             transparent: true,
             clippingPlanes: [
@@ -926,6 +940,7 @@ class ArctapNote extends ArcaeaJudgableEvent {
     destroy() {
         GameplayManager.instance.game.scene.remove(this.gameObject);
         GameplayManager.instance.game.scene.remove(this.shadow);
+        this.removeArcTapConnection();
     }
 
     rebuild() {
@@ -940,13 +955,15 @@ class ArctapNote extends ArcaeaJudgableEvent {
 
     static newObject() {
         var loader = new THREE.TextureLoader();
-        var texture = loader.load("./assets/textures/ArcTapLight.png");
-        texture.anisotropy = 16;
+        var texture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/ArcTapLight.png");
+        if(texture) {
+            texture.anisotropy = 16;
+        }
 
         var material = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0xbeb6da : 0xffffff,
             map: texture,
-            transparent: true
+            transparent: true,
         });
         var geometry = new THREE.BoxGeometry(1, 1);
 
@@ -993,6 +1010,7 @@ class ArctapNote extends ArcaeaJudgableEvent {
         sameTimeTaps.forEach(t => {
             var material = new THREE.MeshBasicMaterial({
                 color: 0x78c8dc,
+                transparent: true
             });
             var p = (this.time - arc.time) / (arc.endTime - arc.time);
             var posA = new Vector2(-ArcAlgorithm.arcXToWorld(ArcAlgorithm.resolveX(arc.start.x, arc.end.x, p, arc.lineType)), ArcAlgorithm.arcYToWorld(ArcAlgorithm.resolveY(arc.start.y, arc.end.y, p, arc.lineType)) - 0.5);
@@ -1038,19 +1056,10 @@ class ArctapNote extends ArcaeaJudgableEvent {
     }
 
     removeArcTapConnection() {
-        var taps = TapNoteManager.instance.taps;
-        var sameTimeTaps = taps.filter(s => {
-            return Math.abs(s.time - this.time) < 1 && s.timingGroup == this.timingGroup
-        });
-
-        sameTimeTaps.forEach(t => {
-            this.connections.filter(c => {
-                return c.tap == t;
-            }).forEach(el => {
-                GameplayManager.instance.game.scene.remove(el.line);
-                var i = this.connections.indexOf(el);
-                if(i != -1) this.connections.splice(i, 1);
-            });
+        this.connections.forEach(el => {
+            GameplayManager.instance.game.scene.remove(el.line);
+            var i = this.connections.indexOf(el);
+            if(i != -1) this.connections.splice(i, 1);
         });
     }
 }
@@ -1058,9 +1067,9 @@ class ArctapNote extends ArcaeaJudgableEvent {
 class ArcSegment {
     constructor() {
         /** @type {TGeometry} */
-        this.geometry = new THREE.BoxGeometry();
+        this.geometry = new THREE.Geometry();
         /** @type {TGeometry} */
-        this.shadowGeometry = new THREE.PlaneGeometry();
+        this.shadowGeometry = new THREE.Geometry();
 
         this.fromPos = new Vector3(0, 0, 0);
         this.toPos = new Vector3(0, 0, 0);
@@ -1201,7 +1210,7 @@ class ArcRenderer {
         this.buildArcCap();
 
         var loader = new THREE.TextureLoader();
-        var sTexture = loader.load("./assets/textures/ArcBody.png");
+        var sTexture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/ArcBody.png");
         var sMaterial = new THREE.MeshBasicMaterial({
             color: this.color.getHex(),
             opacity: this.arc.isVoid ? 0.4166 : 0.572549,
@@ -1210,7 +1219,8 @@ class ArcRenderer {
             clippingPlanes: [
                 new THREE.Plane( new THREE.Vector3( 0, 0, -1 ), 0),
                 new THREE.Plane( new THREE.Vector3( 0, 0, 1 ), 100)
-            ]
+            ],
+            side: THREE.DoubleSide
         });
         var sdMaterial = new THREE.MeshBasicMaterial({
             color: this.arc.isVoid ? 0xaaaaaa : 0x888888,
@@ -1254,10 +1264,10 @@ class ArcRenderer {
         var arc = this.arc;
 
         var loader = new THREE.TextureLoader();
-        var cTexture = loader.load("./assets/textures/ArcCap.png");
+        var cTexture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/ArcCap.png");
         var plane = new THREE.PlaneGeometry(2.5, 2.5);
         var cMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0x6c526f : 0xffffff,
             map: cTexture,
             transparent: true,
             opacity: 1
@@ -1266,7 +1276,9 @@ class ArcRenderer {
         var obj = new THREE.Mesh(plane, cMaterial);
         obj.renderOrder = 1000;
         obj.position.set(-ArcAlgorithm.arcXToWorld(arc.start.x), 0, 0);
-        obj.scale.set(2.34, 2 * (ArcAlgorithm.arcYToWorld(arc.start.y) - ArcRenderer.offsetNormal / 2), 1);
+        if(GameplayManager.instance.colorsOnly) {
+            obj.setRotationFromEuler(new THREE.Euler(0, 0, Math.PI / 4));
+        }
         this.arcCap = obj;
         obj.renderOrder = 10010;
     }
@@ -1279,12 +1291,13 @@ class ArcRenderer {
         }
 
         var loader = new THREE.TextureLoader();
-        var hTexture = loader.load("./assets/textures/HeightIndicator.png");
+        var hTexture = GameplayManager.instance.colorsOnly ? null: loader.load("./assets/textures/HeightIndicator.png");
         var plane = new THREE.PlaneGeometry();
         var hMaterial = new THREE.MeshBasicMaterial({
             color: ArcRenderer.colors[arc.color].getHex(),
             map: hTexture,
             transparent: true,
+            side: THREE.DoubleSide,
             opacity: 0.572549,
             clippingPlanes: [
                 new THREE.Plane( new THREE.Vector3( 0, 0, -1 ), 0)
@@ -1294,7 +1307,7 @@ class ArcRenderer {
         var obj = new THREE.Mesh(plane, hMaterial);
         obj.renderOrder = 1000;
         obj.position.set(-ArcAlgorithm.arcXToWorld(arc.start.x), 0, 0);
-        obj.scale.set(2.34, 2 * (ArcAlgorithm.arcYToWorld(arc.start.y) - ArcRenderer.offsetNormal / 2), 1);
+        obj.scale.set(GameplayManager.instance.colorsOnly ? 0.4 : 2.34, 2 * (ArcAlgorithm.arcYToWorld(arc.start.y) - ArcRenderer.offsetNormal / 2), 1);
         this.heightIndicator = obj;
     }
 
@@ -1382,7 +1395,7 @@ class ArcRenderer {
         g.computeFaceNormals();
 
         var loader = new THREE.TextureLoader();
-        var sTexture = loader.load("./assets/textures/ArcBody.png");
+        var sTexture = GameplayManager.instance.colorsOnly ? null: loader.load("./assets/textures/ArcBody.png");
         var sMaterial = new THREE.MeshBasicMaterial({
             color: this.color.getHex(),
             opacity: this.arc.isVoid ? 0.4166 : 0.572549,
@@ -1500,14 +1513,14 @@ class ArcRenderer {
         if(arc.position > 0 && arc.position < 100000) {
             if(arc.renderHead && !arc.isVoid) {
                 var p = 1 - arc.position / 100000;
-                var scale = 0.35 + 0.5 * (1 - p);
+                var scale = 0.35 + 0.5 * (1 - p) * (GameplayManager.instance.colorsOnly ? 0.7 : 1);
                 this.enableArcCap = true;
                 
                 var a = this.arcCap;
                 a.material.opacity = p;
                 a.scale.set(scale, scale, 1);
 
-                a.position.set(-ArcAlgorithm.arcXToWorld(arc.start.x), ArcAlgorithm.arcYToWorld(arc.start.y), -a.parent.position.z + 0.5);
+                a.position.set(-ArcAlgorithm.arcXToWorld(arc.start.x), ArcAlgorithm.arcYToWorld(arc.start.y), -a.parent.position.z + 0.01);
             } else {
                 this.enableArcCap = false;
             }
@@ -1516,7 +1529,7 @@ class ArcRenderer {
             
             var a = this.arcCap;
             a.material.opacity = arc.isVoid ? 0.5 : 1;
-            var scale = arc.isVoid ? 0.21 : 0.35;
+            var scale = arc.isVoid ? 0.21 : 0.35 * (GameplayManager.instance.colorsOnly ? 0.7 : 1);
             a.scale.set(scale, scale, 1);
 
             var doBreak = false;
@@ -1527,7 +1540,7 @@ class ArcRenderer {
                     a.position.set(
                         s.fromPos.x + (s.toPos.x - s.fromPos.x) * t,
                         s.fromPos.y + (s.toPos.y - s.fromPos.y) * t,
-                        -a.parent.position.z + 0.5
+                        -a.parent.position.z + 0.01
                     );
                     if(!arc.isVoid) {
                         ArcManager.instance.arcJudgePos += a.position.x;
@@ -1745,7 +1758,7 @@ class TimingEvent extends ArcaeaEvent {
      */
     static fromRaw(line, timingGroup) {
         var result = line.match(/timing\((.*?),(.*?),(.*?)\)/);
-        return new TimingEvent(timingGroup, parseInt(result[1]), parseInt(result[2]), parseInt(result[3]));
+        return new TimingEvent(timingGroup, parseInt(result[1]), parseFloat(result[2]), parseFloat(result[3]));
     }
 
     export(offset = 0) {
@@ -1836,6 +1849,127 @@ class TimingManager {
     constructor() {
         TimingManager.instance = this;
         this.dropRate = 100;
+
+        /** @type {TimingGroup} */
+        this.timingGroup = null;
+
+        /** @type {TimingEvent[]} */
+        this.timings = [];
+
+        /** @type {TObject3D[]} */
+        this.beatlines = [];
+
+        this.beatlineTimings = [];
+    }
+
+    clean() {
+        this.timingGroup = null;
+        this.timings = [];
+        this.beatlineTimings = [];
+        this.hideExceededBeatlines(0);
+    }
+
+    getBeatline(index) {
+        while(this.beatlines.length < index + 1) {
+            var bGeometry = new THREE.PlaneGeometry();
+            var bMaterial = new THREE.MeshBasicMaterial({
+                color: 0xaaaaaa
+            });
+            var line = new THREE.Mesh(bGeometry, bMaterial);
+            line.scale.set(17.1, 0.2, 1);
+            line.setRotationFromEuler(new THREE.Euler(-90 / 180 * Math.PI, 0, 0));
+            GameplayManager.instance.game.scene.add(line);
+            this.beatlines.push(line);
+        }
+        return this.beatlines[index];
+    }
+
+    hideExceededBeatlines(quantity) {
+        var count = this.beatlines.length;
+        while(count > quantity) {
+            this.beatlines[count - 1].visible = false;
+            count--;
+        }
+    }
+
+    /**
+     * @param {TimingGroup} timingGroup
+     * @param {TimingEvent[]} timings
+     */
+    load(timingGroup, timings) {
+        this.timingGroup = timingGroup;
+        this.timings = timings;
+        this.calculateBeatlineTimes();
+    }
+
+    calculateBeatlineTimes() {
+        this.beatlineTimings = [];
+        this.hideExceededBeatlines(0);
+        var timings = this.timings;
+
+        for(var i=0; i<timings.length-1; ++i) {
+            var segment = timings[i].bpm == 0 ? (timings[i+1].time - timings[i].time) : (60000 / Math.abs(timings[i].bpm) * timings[i].beatsPerLine);
+            if(segment == 0) continue;
+
+            var n = 0;
+            while(true) {
+                var j = timings[i].time + (n++) * segment;
+                if(j >= timings[i + 1].time) {
+                    break;
+                }
+                this.beatlineTimings.push(j);
+            }
+        }
+
+        if(timings.length >= 1) {
+            var segmentsRemain = timings[timings.length - 1].bpm == 0 ? (GameplayManager.instance.length - timings[timings.length - 1].time)
+                : 60000 / Math.abs(timings[timings.length - 1].bpm) * timings[timings.length - 1].beatsPerLine;
+            
+            if(segmentsRemain != 0) {
+                var n = 0;
+                var j = timings[timings.length - 1].time;
+                while(j < GameplayManager.instance.length) {
+                    j = timings[timings.length - 1].time + (n++) * segmentsRemain;
+                    this.beatlineTimings.push(j);
+                }
+            }
+        }
+
+        if(timings.length >= 1 && timings[0].bpm != 0 && timings[0].beatsPerLine != 0) {
+            var t = 0;
+            var delta = 60000 / Math.abs(timings[0].bpm) * timings[0].beatsPerLine;
+            var n = 0;
+            if(delta != 0) {
+                while(t >= -3000) {
+                    t = -(++n) * delta;
+                    this.beatlineTimings.unshift(t);
+                }
+            }
+        }
+    }
+
+    updateBeatline() {
+        var index = 0;
+        var offset = GameplayManager.instance.audioManager.offset;
+
+        this.beatlineTimings.forEach(t => {
+            var z = this.timingGroup.getPosByTiming(Math.floor(t + offset)) / 1000;
+            if(z < 0 || z > 100) {
+                return;
+            }
+
+            var line = this.getBeatline(index);
+            line.visible = true;
+            line.position.set(0, 0.1, -z);
+            line.scale.y = 0.2 + z * 0.01;
+            index++;
+        });
+        this.hideExceededBeatlines(index);
+    }
+
+    update() {
+        if(this.timingGroup == null) return;
+        this.updateBeatline();
     }
 }
 /** @type {TimingManager} */
@@ -1930,13 +2064,13 @@ class CameraManager {
                 rotation = this.getResetRotation();
             }
             
-            position.x += -c.translation.x * c.percent / 100;
+            position.x += c.translation.x * c.percent / 100;
             position.y += c.translation.y * c.percent / 100;
             position.z += c.translation.z * c.percent / 100;
 
-            rotation.x += -c.rotation.x * c.percent;
-            rotation.y += c.rotation.y * c.percent;
-            rotation.z += c.rotation.z * c.percent;
+            rotation.x += c.rotation.y * c.percent;
+            rotation.y += c.rotation.x * c.percent;
+            rotation.z += -c.rotation.z * c.percent;
         }
 
         this.camera.up.set(0, 1, 0);
@@ -1945,11 +2079,14 @@ class CameraManager {
     }
 
     updateCameraTilt() {
-        if(!this.isReset) return;
+        if(!this.isReset)  {
+            this.currentTilt = 0;
+            return;
+        }
         var currentArcPos = GameplayManager.instance.autoplay ? -ArcManager.instance.arcJudgePos : 0;
         var pos = Utils.clamp(currentArcPos / 4.25, -1, 1) * 0.05;
         var delta = pos - this.currentTilt;
-        var speed = GameplayManager.instance.audioManager.isPlaying ? (currentArcPos == 0 ? 0.02 : 0.04) : 0;
+        var speed = GameplayManager.instance.audioManager.isPlaying ? (currentArcPos == 0 ? 0.02 : 0.04) : 0.03;
         this.currentTilt = this.currentTilt + speed * delta;
         this.camera.up.set(this.currentTilt, 1 - this.currentTilt, 0);
         this.camera.lookAt(new THREE.Vector3(0, -5.5, -20)); 
@@ -2056,7 +2193,7 @@ class LegacyAudioManager extends AudioManagerBase {
      * @param {number} offset Audio offset in milliseconds.
      */
     load(url, offset) {
-        this.offset = offset - 180;
+        this.offset = offset;
         return new Promise((resolve, reject) => {
             this.audioElem.src = url;
             this.audioElem.addEventListener("loadeddata", e => {
@@ -2171,6 +2308,7 @@ class AudioManager extends AudioManagerBase {
         this.stop();
         if(this.audioSource) {
             this.audioSource.disconnect();
+            this.audioSource.buffer = null;
         }
         this.audioSource = null;
 
@@ -2289,8 +2427,14 @@ class GameplayManager {
         this.audioManager = conditions ? new LegacyAudioManager(elem) : new AudioManager(elem);
         this.audioManager.volume = 0.3;
 
+        this.colorsOnly = location.protocol == "file:";
+
         this.lastUpdate = 0;
         this.deltaTime = 0;
+
+        this.difficulties = [
+            "Past", "Present", "Future", "Beyond"
+        ];
 
         this.autoplay = true;
         
@@ -2426,7 +2570,7 @@ class TapNoteManager {
             t.enabled = true;
             t.gameObject.visible = true;
             var pos = t.position / 1000;
-            t.gameObject.position.set(this.lanes[t.lane - 1], 0.11, -pos - 0.8);
+            t.gameObject.position.set(this.lanes[t.lane - 1], 0.11, -pos - 1.15);
             t.gameObject.material.opacity = pos < 90 ? 1 : (100 - pos) / 10;
         });
     }
@@ -2715,6 +2859,7 @@ class ArcManager {
                 t.shadow.visible = true;
                 t.connections.forEach(c => {
                     c.line.visible = true;
+                    c.line.material.opacity = 1;
                 });
             } else if(pos > 90 && pos <= 100) {
                 t.enabled = true;
@@ -2723,6 +2868,7 @@ class ArcManager {
                 t.shadow.visible = true;
                 t.connections.forEach(c => {
                     c.line.visible = true;
+                    c.line.material.opacity = (100 - pos) / 10;
                 });
                 t.shadow.material.opacity = (100 - pos) / 10;
             } else {
@@ -2864,7 +3010,10 @@ class HoldManager {
 HoldManager.instance = null;
 
 class GameBase {
-    constructor() {
+    /** 
+     * @param {HTMLCanvasElement | null}
+     */
+    constructor(canvas) {
         this.scene = new THREE.Scene();
         this.backScene = new THREE.Scene();
 
@@ -2874,29 +3023,38 @@ class GameBase {
 
         this.camera = new THREE.PerspectiveCamera(50, aspect, 1, 10000);
         this.backCamera = new THREE.OrthographicCamera(1920 / -2, 1920 / 2, 1080 / 2, 1080 / -2, 0, 100);
+        this.gameplayManager = new GameplayManager(this);
         this.setupScene();
 
         var renderer = this.renderer = new THREE.WebGLRenderer({
+            canvas,
             antialias: true
         });
         renderer.localClippingEnabled = true;
         renderer.setSize(width, height, false);
         
         /** @type {HTMLCanvasElement} */
-        var canvas = this.canvas = renderer.domElement;
-        canvas.id = "main";
-        document.getElementById("canvas-wrapper").appendChild(canvas);
+        this.canvas = renderer.domElement;
+        this.canvas.id = "main";
+        if(canvas == null) {
+            document.getElementById("canvas-wrapper").appendChild(this.canvas);
+        }
 
         /** @type {Chart} */
         this.chart = null;
 
-        this.gameplayManager = new GameplayManager(this);
         this.timingManager = new TimingManager();
         this.cameraManager = new CameraManager(this.camera);
 
         this.tapNoteManager = new TapNoteManager();
         this.arcManager = new ArcManager();
         this.holdManager = new HoldManager();
+
+        this.albumSrc = "./assets/charts/a0/base.jpg";
+        this.songName = "--";
+        this.artistName = "";
+        this.difficultyType = 2;
+        this.difficultyLvl = "7";
 
         this.update();
     }
@@ -2931,9 +3089,9 @@ class GameBase {
     setupBackground() {
         var plane = new THREE.PlaneGeometry(1920, 1080);
         var loader = new THREE.TextureLoader();
-        var bg = loader.load("./assets/textures/Axiumcrisis.jpg");
+        var bg = GameplayManager.instance.colorsOnly ? null: loader.load("./assets/textures/Axiumcrisis.jpg");
         var material = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0x171433 : 0xffffff,
             map: bg
         });
         var obj = new THREE.Mesh(plane, material);
@@ -2946,22 +3104,32 @@ class GameBase {
         var box = new THREE.BoxGeometry();
         var loader = new THREE.TextureLoader();
 
-        var trackTexture = loader.load("./assets/textures/TrackWhite.png");
-        trackTexture.wrapT = THREE.RepeatWrapping;
-        trackTexture.repeat.set(1, 55);
-        setInterval(() => {
-            var speed = 1;
-            if(this.chart) {
-                var g = this.chart.timingGroups[0];
-                speed = g.getBpmByTiming(this.timing) / g.getBaseBpm();
-            }
-            trackTexture.offset.set(0, ((performance.now() * this.timingManager.dropRate / 50 * speed) % 1000) / 1000);
-        }, 10);
-        var trackMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            map: trackTexture
-        });
+        var trackMaterial = null;
+        if(GameplayManager.instance.colorsOnly) {
+            trackMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff
+            });
+        } else {
+            var trackTexture = loader.load("./assets/textures/TrackWhite.png");
+            trackTexture.wrapT = THREE.RepeatWrapping;
+            trackTexture.repeat.set(1, 55);
+            setInterval(() => {
+                var speed = 1;
+                if(this.chart) {
+                    var g = this.chart.timingGroups[0];
+                    speed = g.getBpmByTiming(this.gameplayManager.timing - this.gameplayManager.audioManager.offset) / g.getBaseBpm();
+                }
+                var y = trackTexture.offset.y;
+                y += (this.gameplayManager.deltaTime * this.timingManager.dropRate / 12 * speed) / 1000;
+                y = y % 1;
+                trackTexture.offset.set(0, y);
+            }, 10);
+            trackMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                map: trackTexture
+            });
+        }
 
         var cube = new THREE.Mesh(box, trackMaterial);
         cube.position.x = 0;
@@ -2974,24 +3142,29 @@ class GameBase {
         this.scene.add( cube );
 
         // Sky Input
-        var skTexture = loader.load("./assets/textures/SkyInputLine.png");
-        var skLabelTexture = loader.load("./assets/textures/SkyInputLabel.png");
+        var skTexture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/SkyInputLine.png");
+        var skLabelTexture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/SkyInputLabel.png");
         var skMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0xff5555 : 0xffffff,
             map: skTexture,
-            transparent: true
+            transparent: true,
+            opacity: GameplayManager.instance.colorsOnly ? 0.5 : 1,
+            side: THREE.DoubleSide
         });
         var skLabelMaterial = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             map: skLabelTexture,
-            transparent: true
+            transparent: true,
+            opacity: GameplayManager.instance.colorsOnly ? 0 : 1,
+            side: THREE.DoubleSide
         });
 
-        var dTexture = loader.load("./assets/textures/TrackLaneDivider.png");
+        var dTexture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/TrackLaneDivider.png");
         var dMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0 : 0xffffff,
             map: dTexture,
-            transparent: true
+            transparent: true,
+            opacity: GameplayManager.instance.colorsOnly ? 0.1 : 1
         });
 
         // 3 division lines.
@@ -3016,17 +3189,17 @@ class GameBase {
             this.scene.add(dLineR);
         }
 
-        var clTexture = loader.load("./assets/textures/TrackCriticalLine.png");
+        var clTexture = GameplayManager.instance.colorsOnly ? null : loader.load("./assets/textures/TrackCriticalLine.png");
         var clMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: GameplayManager.instance.colorsOnly ? 0x4f4463 : 0xffffff,
             map: clTexture,
             transparent: true
         });
 
         var criticalLine = new THREE.Mesh(plane, clMaterial );
-        criticalLine.position.set(0, 0.051, 0);
+        criticalLine.position.set(0, 0.051, GameplayManager.instance.colorsOnly ? 0.15 : 0);
         criticalLine.scale.x = 17.1;
-        criticalLine.scale.y = 1;
+        criticalLine.scale.y = GameplayManager.instance.colorsOnly ? 0.4 : 1;
         criticalLine.scale.z = 1;
         criticalLine.setRotationFromEuler(new THREE.Euler(-90 / 180 * Math.PI, 0, 0));
         criticalLine.renderOrder = -300;
@@ -3035,7 +3208,7 @@ class GameBase {
         var skLine = new THREE.Mesh(plane, skMaterial);
         skLine.position.y = 5.5;
         skLine.scale.x = 1920;
-        skLine.scale.y = 0.25;
+        skLine.scale.y = GameplayManager.instance.colorsOnly ? 0.1 : 0.25;
         skLine.renderOrder = 9999;
         this.scene.add(skLine);
 
@@ -3050,6 +3223,7 @@ class GameBase {
     }
 
     clean() {
+        TimingManager.instance.clean();
         TapNoteManager.instance.clean();
         ArcManager.instance.clean();
         HoldManager.instance.clean();
@@ -3065,11 +3239,14 @@ class GameBase {
         this.clean();
         this.chart = chart;
 
-        this.gameplayManager.audioManager.load(audio, chart.offset);
-        this.tapNoteManager.load(chart.taps());
-        this.arcManager.load(chart.arcs());
-        this.holdManager.load(chart.holds());
-        this.cameraManager.load(chart.cameras());
+        var tg = chart.getPrimaryTimingGroup();
+        this.gameplayManager.audioManager.load(audio, chart.offset).then(() => {
+            this.timingManager.load(tg, tg.getTimingEvents());
+            this.tapNoteManager.load(chart.taps());
+            this.arcManager.load(chart.arcs());
+            this.holdManager.load(chart.holds());
+            this.cameraManager.load(chart.cameras());
+        });
     }
 
     countCombo() {
@@ -3117,7 +3294,7 @@ class GameBase {
         var combo = this.countCombo();
         var score = Math.floor(10000000 * combo / total) + combo;
 
-        return [score, combo];
+        return [score, combo, total];
     }
 
     update() {
@@ -3137,20 +3314,27 @@ class GameBase {
 
         // Managers update
         this.gameplayManager.update();
-        this.tapNoteManager.update();
-        this.arcManager.update();
-        this.holdManager.update();
-        this.cameraManager.update();
-
+        
         if(this.chart) {
             this.chart.timingGroups.forEach(t => {
                 t.updateRenderRange();
             });
         }
+        
+        this.timingManager.update();
+        this.tapNoteManager.update();
+        this.arcManager.update();
+        this.holdManager.update();
+        this.cameraManager.update();
 
         var comboText = document.getElementById("combo");
         var scoreText = document.getElementById("score");
-        var [score, combo] = this.countScore();
+        var [score, combo, total] = this.countScore();
+
+        var oldScore = parseInt(scoreText.innerText);
+        if(GameplayManager.instance.audioManager.isPlaying) {
+            score = oldScore < score ? Math.round(Math.min(oldScore + (9 *  total) / GameplayManager.instance.deltaTime, score)) : score;
+        }
 
         comboText.innerText = combo >= 2 ? combo : "";
 
@@ -3160,6 +3344,24 @@ class GameBase {
         }
         scoreStr += score;
         scoreText.innerText = scoreStr;
+
+        // Chart info
+        var diffMeta = document.getElementById("diff-meta");
+        diffMeta.className = "diff-" + this.difficultyType;
+        var diffTxt = document.getElementById("diff");
+        diffTxt.innerText = this.gameplayManager.difficulties[this.difficultyType] + " " + this.difficultyLvl;
+        var nameTxt = document.getElementById("name");
+        var artistTxt = document.getElementById("artist");
+        nameTxt.innerText = this.songName;
+        artistTxt.innerText = this.artistName;
+        var albumImg = document.getElementById("album");
+        albumImg.src = this.albumSrc;
+        var prog = document.getElementById("track-prog");
+        prog.value = GameplayManager.instance.audioManager.timing / (GameplayManager.instance.audioManager.length() || 1) * 100;
+
+        if(window.innerHeight > window.innerWidth) {
+            document.getElementById("game-wrapper").classList.remove("fullscreen");
+        }
 
         this.renderer.setSize(width, height, false);
         this.renderer.autoClear = false;

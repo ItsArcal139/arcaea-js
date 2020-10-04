@@ -1,39 +1,280 @@
 <html>
     <head>
-        <title></title>
+        <title>Arcaea 譜面模擬器</title>
         <meta charset="utf-8">
-        <link rel="stylesheet" href="style.css">
+        <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="style.css" />
+        <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+        <meta name="viewport" content="width=device-width, initial-scale=0.8, viewport-fit=cover" />
     </head>
     <body>
-        <div id="game-area">
-            <div id="canvas-wrapper"></div>
-            <div id="info-wrapper">
-                <span id="score">00000000</span>
+        <nav class="navbar navbar-nav navbar-expand-lg navbar-dark bg-dark">
+        <div class="container pl-3">
+            <span class="navbar-brand">Arcaea 譜面模擬器</span>
+        </div>
+        </nav>
+        <div class="container pt-3">
+            <div id="game-wrapper">
+                <div id="game-area">
+                    <div id="canvas-wrapper"></div>
+                    <div id="info-wrapper">
+                        <span id="score">00000000</span>
+                        <progress value="50" max="100" id="track-prog"></progress>
+                        <div class="album-wrapper">
+                            <img src="./assets/charts/a0/base.jpg" alt="" srcset="" id="album">
+                        </div>
+                        <div id="diff-meta">
+                            <div class="wrapper">
+                                <span id="diff">Future 8</span>
+                            </div>
+                        </div>
+                        <div class="chart-meta">
+                            <span id="name">world.execute(me);</span><br/>
+                            <span id="artist">Mili</span>
+                        </div>
+                    </div>
+                    <div id="combo-wrapper">
+                        <span id="combo">1234</span>
+                    </div>
+                </div>
             </div>
-            <div id="combo-wrapper">
-                <span id="combo">1234</span>
+
+            <div class="accordion my-3">
+                <div class="card">
+                    <!-- Collapse toggle area -->
+                    <div class="card-header">
+                        <h2 class="mb-0">
+                            <button class="btn btn-link" data-toggle="collapse" data-target="#basic-config">基本設定</button>
+                        </h2>
+                    </div>
+
+                    <!-- Collapsed area -->
+                    <div class="collapse show" id="basic-config">
+                        <div class="p-3">
+                            <audio id="game-audio" controls></audio>
+                            <div class="container mt-3 row">
+                                <div class="col-lg">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text" id="basic-addon1">播放速度</span>
+                                        </div>
+                                        <div class="btn-group" role="group" aria-label="Basic example">
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">0.5x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">0.75x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">1x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">1.25x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">1.5x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">2x</button>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-primary" onclick="setupDebugger(this)" id="enable-debugger">啟用進階選項</button>
+                                </div>
+                                <div class="col-lg">
+                                    <button type="button" class="btn btn-primary" onclick="fullScreen()">全螢幕並播放</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-header">
+                        <h2 class="mb-0">
+                            <button class="btn btn-link" data-toggle="collapse" data-target="#pg_id-table">Arcaea 譜面</button>
+                        </h2>
+                    </div>
+                    <div class="collapse show" id="pg_id-table">
+                        <div class="p-3">
+                            
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" id="label-chart">譜面</span>
+                                </div>
+                                <input type="file" class="form-control" id="input-chart" />
+                            </div>
+                            
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" id="label-audio">音檔</span>
+                                </div>
+                                <input type="file" class="form-control" id="input-audio" />
+                            </div>
+
+                            <button class="mb-3 btn btn-primary" onclick="loadChart()">載入</button>
+
+                            <button class="mb-3 btn btn-secondary" onclick="loadTables()">重新整理</button>
+                            <table class="table" id="pg-map-table">
+                                <tr>
+                                    <th scope="col">#</th><th scope="col">歌名</th><th scope="col"> </th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <audio controls id="game-audio"></audio>
         </div>
     </body>
     <script src="./dat.gui.min.js"></script>
     <script src="./three.js"></script>
     <script src="./arcaea.js"></script>
     <script>
+        var Constants = {
+            difficulties: [
+                "Past", "Present", "Future", "Beyond"
+            ]
+        };
+
         function hasQuery(key) {
             return location.search.indexOf("?"+key) != -1 || location.search.indexOf("&"+key) != -1;
         }
-
         var game = new GameBase();
-        (async () => {
-            game.load(await Chart.download("/phigros/assets/charts/wem/2.aff"), "/phigros/assets/charts/wem/base.wav");
-        })();
-        
 
-        if(hasQuery("dev")) {
+        setTimeout(() => {
+            var handler = e => {
+                e.preventDefault();
+            };
+            var canvas = document.getElementById("main");
+            canvas.addEventListener("touchstart", handler);
+            canvas.addEventListener("click", handler);
+            var comboWrapper = document.getElementById("combo-wrapper");
+            comboWrapper.addEventListener("touchstart", handler);
+            comboWrapper.addEventListener("click", handler);
+            var infoWrapper = document.getElementById("info-wrapper");
+            infoWrapper.addEventListener("touchstart", handler);
+            infoWrapper.addEventListener("click", handler);
+
+            if(hasQuery("dev")) {
+                setupDebugger(document.getElementById("enable-debugger"));
+            }
+        }, 1);
+
+        function setupDebugger(btn) {
+            btn.disabled = true;
             var s = document.createElement("script");
             s.src = "debugger.js";
             document.body.append(s);
         }
+
+        function switchSpeed(btn) {
+            var speedText = btn.innerText;
+            var speed = parseFloat(speedText.substring(0, speedText.length - 1));
+            game.gameplayManager.audioManager.setPlaybackRate(speed);
+        }
+
+        function fullScreen() {
+            var canvas = document.getElementById("game-wrapper");
+
+            var createMatch = s => regex => regex.test(s);
+            var m = createMatch(navigator.userAgent);
+            if(m(/iPhone/i) || m(/iPad/i) || m(/iPod/i) || (m(/Macintosh/i) && m(/Safari/i) && !m(/Chrome/i))) {
+                canvas.classList.add("fullscreen");
+                setTimeout(() => {
+                    game.gameplayManager.audioManager.play();
+                }, 1000);
+            } else {
+                canvas.requestFullscreen();
+                setTimeout(() => {
+                    game.gameplayManager.audioManager.play();
+                }, 5000);
+            }
+        }
+
+        function loadChart() {
+            var audioInput = document.getElementById("input-audio");
+            var chartInput = document.getElementById("input-chart");
+            var rmfpBox = document.getElementById("remove-first-page");
+
+            game.loadMap(URL.createObjectURL(chartInput.files.item(0)), {
+                audio: URL.createObjectURL(audioInput.files.item(0))
+            });
+        }
+
+        function loadTables() {
+            var c2Table = document.getElementById("pg-map-table");
+
+            var t = `<tr>
+                <th scope="col">#</th><th scope="col">歌名</th><th scope="col"> </th>
+            </tr>`;
+            c2Table.innerHTML = `<tr>
+                <th scope="col">歌名</th><th scope="col"> </th>
+            </tr>`;
+
+            fetch("./assets/charts/db.json", {
+                cache: "no-cache"
+            }).then(r => r.json())
+            .then(db => {
+                function create(name) {
+                    return document.createElement(name);
+                }
+
+                function createBadge(name, color) {
+                    var badge = create("span");
+                    badge.classList.add("badge", "align-middle", "mr-1");
+                    badge.style.background = color || "#90a4ae";
+                    badge.style.color = "#fff";
+                    badge.innerText = name;
+                    return badge;
+                }
+
+                var diffColor = {
+                    easy: "#3d5afe",
+                    normal: "#43a047",
+                    hard: "#ffa000",
+                    expert: "#d50000",
+                    special: "#d500f9"
+                };
+                
+                db.forEach(item => {
+                    var row = create("tr");
+
+                    var titleCell = create("td");
+                    var titleContainer = create("div");
+                    titleCell.classList.add("align-middle");
+                    titleContainer.innerHTML = `<div class="spinner-grow" role="status"><span class="sr-only">載入中...</span></div>`;
+                    titleContainer.style.display = "inline-block";
+                    titleContainer.classList.add("mr-4", "align-middle");
+                    titleCell.appendChild(titleContainer);
+
+                    var loadCell = create("td");
+                    loadCell.innerHTML = `<button class="btn btn-link">載入</button>`;
+                    loadCell.children[0].addEventListener("click", e => {
+                        (async () => {
+                            game.load(await Chart.download(item.chart), item.audio);
+                        })();
+                        game.songName = item.name;
+                        game.artistName = item.artist;
+                        game.difficultyType = item.difficulty.type;
+                        game.difficultyLvl = item.difficulty.level + (item.difficulty.plus ? "+" : "");
+                        document.body.scrollTo({
+                            top: 0
+                        });
+                    });
+
+                    row.appendChild(titleCell);
+                    row.appendChild(loadCell);
+
+                    var fillItem = (item) => {
+                        var html = `<span>${item.name}</span>`;
+                        function ra(s, a, b) {
+                            var r = s;
+                            while(r != r.replace(a, b)) {
+                                r = r.replace(a, b);
+                            }
+                            return r;
+                        }
+                        html = ra(html, "[FULL]", `<div style="background-color: transparent; background-image: url('./assets/full.png'); background-size: cover; background-blend-mode: multiply; display: inline-block; vertical-align: middle; width: 1.6em; height: 0.8em; margin-top: -0.2em;"></div>`);
+                        
+                        titleContainer.innerHTML = html + "&nbsp;&nbsp;&nbsp;";
+                        var diff = item.difficulty;
+                        titleContainer.appendChild(createBadge((Constants.difficulties[diff.type] || "SP") + " " + (diff.level == -1 ? "??" : diff.level), diff.color));
+                    };
+                    fillItem(item);
+
+                    c2Table.appendChild(row);
+                });
+            });
+        }
+        loadTables();
     </script>
 </html>

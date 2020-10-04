@@ -15,7 +15,7 @@ canvas#main {
 }
 
 #game-area {
-    width: 77%;
+    width: 100%;
     margin: 0 auto;
     position: relative;
 }
@@ -43,19 +43,95 @@ canvas#main {
     background-size: cover;
     top: 15px;
     right: 0;
+    overflow: hidden;
 }
 
 #score {
     display: inline-block;
-    margin: 14px 43px;
+    margin: 11px 43px -7px;
     font-family: Exo, ExoFallback, sans-serif;
     font-size: 32px;
     color: #fff;
 }
 
+#track-prog {
+    height: 3px;
+    width: 100%;
+    background: #fff;
+}
+
+#track-prog::-webkit-progress-value {
+    background: #fff;
+}
+
 #game-audio {
     width: 100%;
     margin-top: 10px;
+}
+
+#info-wrapper .album-wrapper {
+    position: absolute;
+    bottom: 11px;
+    left: 45px;
+}
+
+#info-wrapper #album {
+    width: 46px;
+    height: 46px;
+}
+
+#info-wrapper .chart-meta {
+    display: inline-block;
+    width: 150px;
+    height: 45px;
+    position: absolute;
+    bottom: 11px;
+    right: 7px;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    color: #fff;
+    font-family: "Noto Sans CJk TC", Exo, ExoFallback sans-serif;
+    font-size: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 18px;
+}
+
+#diff-meta {
+    transform: skewX(-50deg);
+    line-height: 18px;
+    font-family: "Noto Sans CJk TC", Exo, ExoFallback sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    position: absolute;
+    left: 150px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: 200px;
+    height: 20px;
+}
+
+#diff-meta.diff-0 {
+    background: #18b6da;
+}
+
+#diff-meta.diff-1 {
+    background: #58a229;
+}
+
+#diff-meta.diff-2 {
+    background: #592a88;
+}
+
+#diff-meta.diff-3 {
+    background: #a02e2e;
+}
+
+#diff-meta .wrapper {
+    margin-left: 15px;
+    transform: skewX(50deg);
 }
 
 @media (max-width: 1250px) {
@@ -67,4 +143,13 @@ canvas#main {
     #combo {
         font-size: 80px;
     }
+}
+
+.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000 !important;
 }
