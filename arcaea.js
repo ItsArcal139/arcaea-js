@@ -2070,12 +2070,17 @@ class CameraManager {
 
             rotation.x += c.rotation.y * c.percent;
             rotation.y += c.rotation.x * c.percent;
-            rotation.z += -c.rotation.z * c.percent;
+            rotation.z += c.rotation.z * c.percent;
         }
 
         this.camera.up.set(0, 1, 0);
         this.camera.position.set(position.x, position.y, position.z);
-        this.camera.setRotationFromEuler(new THREE.Euler(rotation.x / 180 * Math.PI, rotation.y / 180 * Math.PI, rotation.z / 180 * Math.PI));
+
+        // The camera is rotating on world axis....
+        this.camera.setRotationFromEuler(new THREE.Euler(0, 0, 0));
+        this.camera.rotateOnAxis(new THREE.Vector3(1, 0, 0), rotation.x / 180 * Math.PI);
+        this.camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), rotation.y / 180 * Math.PI);
+        this.camera.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rotation.z / 180 * Math.PI);
     }
 
     updateCameraTilt() {
